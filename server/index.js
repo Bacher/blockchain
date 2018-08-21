@@ -3,7 +3,6 @@ const Connections = require('./Connections');
 const Connector = require('./Connector');
 const Block = require('./Block');
 const Blocks = require('./Blocks');
-const BlockMiner = require('./BlockMiner');
 const TransactionQueue = require('./TransactionQueue');
 const config = require('./config');
 
@@ -21,7 +20,7 @@ async function init() {
 
     await blocks.load();
 
-    const connections = new Connections(port);
+    const connections = new Connections(port, blocks);
     const server = new BlockchainServer(connections);
     const connector = new Connector(
         connections,
@@ -32,52 +31,6 @@ async function init() {
         tQueue.add(data);
     });
 
-    connections.on('newblock', block => {
-        const [prevHash, , nodePort, transactions, stamp] = JSON.parse(
-            block.data
-        );
-
-        const ts = new Date(stamp);
-
-        if (!Block.verifyBlock(block)) {
-            console.error('INVALID BLOCK HASH');
-            return;
-        }
-
-        if (ts > Date.now() + 5000) {
-            console.error('INVALID TIMESTAMP', stamp);
-            return;
-        }
-
-        const lastBlock = blocks.getLast();
-
-        const index = blocks.nextBlockMinersOrder.indexOf(nodePort);
-
-        const delta = stamp - lastBlock.data[4];
-
-        if (delta < 30 + index * 10000) {
-            console.error(
-                'INVALID TIME INTERVAL',
-                'index:',
-                index,
-                'delta:',
-                delta
-            );
-            return;
-        }
-
-        if (lastBlock.hash !== prevHash) {
-            console.error('INVALID PREV HASH');
-            return;
-        }
-
-        for (let tx of transactions) {
-            tQueue.removeTransaction(tx);
-        }
-
-        addBlock(block);
-    });
-
     function addBlock(block) {
         blocks.add(block);
         clearTimeout(timeoutId);
@@ -86,6 +39,11 @@ async function init() {
 
     function checkNextBlockMiner() {
         const index = blocks.nextBlockMinersOrder.indexOf(config.port);
+        const lastBlock = blocks.getLast();
+
+        const lastBlockStamp = new Date(lastBlock.data[4]);
+
+        const interval = Math.max(0, lastBlockStamp.getTime() + (30 + index * 10) * 1000 - Date.now());
 
         timeoutId = setTimeout(() => {
             const newBlock = new Block(blocks.getLast());
@@ -98,10 +56,10 @@ async function init() {
 
             const block = newBlock.seal();
 
-            connections.safeBroadcastRequest('newBlock', block);
+            connections.broadcastRequest('newBlock', block);
 
             addBlock(block);
-        }, (30 + index * 10) * 1000);
+        }, interval);
     }
 
     server
@@ -119,7 +77,65 @@ async function init() {
             }
         );
 
-    connector.connect();
+    await connector.connect();
+
+    await wait(1000);
+
+    await syncState();
+
+    connections.on('newblock', block => {
+        const lastBlock = blocks.getLast();
+
+        if (lastBlock.hash === block.hash) {
+            return;
+        }
+
+        const [prevHash, , nodePort, transactions, stamp] = JSON.parse(
+            block.data
+        );
+
+        const ts = new Date(stamp);
+
+        if (!Block.verifyBlock(block)) {
+            console.error('INVALID BLOCK HASH');
+            return;
+        }
+
+        if (ts > Date.now() + 5000) {
+            console.error('INVALID TIMESTAMP', stamp);
+            return;
+        }
+
+        if (lastBlock.hash !== prevHash) {
+            console.error('INVALID PREV HASH, start sync');
+
+            syncState().catch(err => {
+                console.error(err);
+            });
+            return;
+        }
+
+        const index = blocks.nextBlockMinersOrder.indexOf(nodePort);
+
+        const delta = stamp - lastBlock.data[4];
+
+        if (delta < 30 + index * 10000) {
+            console.error(
+                'INVALID TIME INTERVAL',
+                'index:',
+                index,
+                'delta:',
+                delta
+            );
+            return;
+        }
+
+        for (let tx of transactions) {
+            tQueue.removeTransaction(tx);
+        }
+
+        addBlock(block);
+    });
 
     checkNextBlockMiner();
 
@@ -139,9 +155,91 @@ async function init() {
             });
 
             tQueue.add(tx);
-            connections.safeBroadcastRequest('addTransaction', tx);
+            connections.broadcastRequest('addTransaction', tx);
         }, Math.floor(Math.random() * 5000));
     }
+
+    async function syncState() {
+        const results = await connections.broadcastRequest('getState');
+
+        const myLast = blocks.getLast();
+
+        let mostRecent = null;
+
+        for (let response of results) {
+            if (
+                !mostRecent ||
+                mostRecent.result.lastBlock.blockNum <
+                    response.result.lastBlock.blockNum
+            ) {
+                mostRecent = response;
+            }
+        }
+
+        if (!mostRecent) {
+            return;
+        }
+
+        if (myLast.hash !== mostRecent.result.hash) {
+            if (
+                myLast.data[1] < mostRecent.result.lastBlock.blockNum ||
+                (myLast.data[1] === mostRecent.result.lastBlock.blockNum &&
+                    myLast.hash < mostRecent.result.lastBlock.hash)
+            ) {
+                await startSyncing(
+                    mostRecent.port,
+                    mostRecent.result.lastBlock.blockNum
+                );
+            } else {
+                await connections.broadcastRequest('newBlock', {
+                    hash: myLast.hash,
+                    data: myLast.rawData,
+                    publicKey: myLast.publicKey,
+                });
+            }
+        }
+    }
+
+    async function startSyncing(port, blockNum) {
+        console.log('start syncing', port, blockNum);
+
+        let start = blockNum;
+
+        const newBlocks = [];
+
+        const node = connections.get(port);
+
+        while (true) {
+            const blocksPart = await node.request('getBlocks', {
+                start,
+                count: 10,
+            });
+
+            newBlocks.push(...blocksPart);
+
+            const block = blocksPart[blocksPart.length - 1];
+            const ourBlock = blocks.get(JSON.parse(block.data)[1]);
+
+            if (ourBlock && block.hash === ourBlock.hash) {
+                break;
+            }
+
+            if (start < 10) {
+                throw new Error('INVARIANT');
+            }
+
+            start = Math.max(0, start - 10);
+        }
+
+        newBlocks.reverse();
+
+        blocks.resetChain(newBlocks);
+        tQueue.clear();
+    }
+}
+
+function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 init().catch(err => {

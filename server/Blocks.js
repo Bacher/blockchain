@@ -8,7 +8,8 @@ class Blocks {
         const blocks = JSON.parse(json);
 
         for (let block of blocks) {
-            block.data = JSON.parse(block.data);
+            block.rawData = block.data;
+            block.data = JSON.parse(block.rawData);
         }
 
         this._blocks = blocks;
@@ -18,24 +19,42 @@ class Blocks {
         console.log('Blocks loaded, length', this._blocks.length);
     }
 
+    resetChain(blocks) {
+        for (let block of blocks) {
+            block.rawData = block.data;
+            block.data = JSON.parse(block.rawData);
+        }
+
+        const blockNum = blocks[0].data[1];
+
+        this._blocks = this._blocks.slice(0, blockNum).concat(blocks);
+
+        console.log('Blockchain was reset to', this.getLast().hash);
+    }
+
+    get(index) {
+        return this._blocks[index];
+    }
+
     getLast() {
         return this._blocks[this._blocks.length - 1];
     }
 
     add(block) {
-        block.data = JSON.parse(block.data);
+        block.rawData = block.data;
+        block.data = JSON.parse(block.rawData);
 
         const lastBlock = this.getLast();
 
         console.log(
             'NEW BLOCK',
-            block.data[0],
             block.data[1],
             block.data[2],
             'tx:',
             block.data[3].length,
             block.data[4],
-            new Date(block.data[4]) - new Date(lastBlock.data[4])
+            new Date(block.data[4]) - new Date(lastBlock.data[4]),
+            block.hash
         );
 
         this._blocks.push(block);

@@ -6,20 +6,26 @@ class Connector {
         this._ports = ports;
     }
 
-    connect() {
+    async connect() {
+        const wait = [];
+
         for (let port of this._ports) {
             if (!this._connections.has(port)) {
-                Connection.connect({
+                const promise = Connection.connect({
                     host: 'localhost',
                     port,
                 }).then(connection => {
                     this._connections.add(connection);
-                }, err => {
-                    // Do nothing
-                });
+                }, noop);
+
+                wait.push(promise);
             }
         }
+
+        await Promise.all(wait);
     }
 }
+
+function noop() {}
 
 module.exports = Connector;

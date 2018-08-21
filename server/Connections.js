@@ -1,9 +1,10 @@
 const { EventEmitter } = require('events');
 
 class Connections extends EventEmitter {
-    constructor(port) {
+    constructor(port, blocks) {
         super();
 
+        this._blocks = blocks;
         this._port = port;
         this._connections = new Set();
         this._nodes = new Map();
@@ -38,23 +39,36 @@ class Connections extends EventEmitter {
     }
 
     has(port) {
-        return this._connections.has(port);
+        return this._nodes.has(port);
+    }
+
+    get(port) {
+        return this._nodes.get(port);
     }
 
     async broadcastRequest(apiName, data) {
         const waits = [];
+        const results = [];
 
-        for (let [, node] of this._nodes) {
-            waits.push(node.request(apiName, data));
+        for (let [port, node] of this._nodes) {
+            waits.push(
+                node.request(apiName, data).then(
+                    result => {
+                        results.push({
+                            port,
+                            result,
+                        });
+                    },
+                    err => {
+                        console.error(err);
+                    }
+                )
+            );
         }
 
         await Promise.all(waits);
-    }
 
-    safeBroadcastRequest(apiName, data) {
-        this.broadcastRequest(apiName, data).catch(err => {
-            console.error(err);
-        });
+        return results;
     }
 
     close(port) {
@@ -69,7 +83,7 @@ class Connections extends EventEmitter {
 
     async _onApiCallSafe(...args) {
         try {
-            await this._onApiCall(...args);
+            return await this._onApiCall(...args);
         } catch (err) {
             console.error(err);
             throw err;
@@ -121,6 +135,24 @@ class Connections extends EventEmitter {
                 this.emit('newblock', data);
                 return;
             }
+            case 'getBlocks':
+                return this._blocks._blocks
+                    .slice(Math.max(0, data.start + 1 - data.count), data.start + 1)
+                    .map(block => ({
+                        data: block.rawData,
+                        hash: block.hash,
+                        publicKey: block.publicKey,
+                    }))
+                    .reverse();
+            case 'getState':
+                const last = this._blocks.getLast();
+
+                return {
+                    lastBlock: {
+                        hash: last.hash,
+                        blockNum: last.data[1],
+                    },
+                };
         }
 
         console.error('UNKNOWN API', apiName);
