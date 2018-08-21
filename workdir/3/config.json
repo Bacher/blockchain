@@ -1,0 +1,21 @@
+{
+  "port": 11003,
+  "keys": {
+    "secretKey": "0rZ9SNviBjSr8WMv+kuTRzqtZi3U1vCKGAG61xIP25ID6L1jIla2Y8g9e65mFlgLj37hPt68OfFRTyWTfB/6sA==",
+    "publicKey": "A+i9YyJWtmPIPXuuZhZYC49+4T7evDnxUU8lk3wf+rA="
+  },
+  "nodes": [
+    {
+      "port": 11001,
+      "publicKey": "a5YUBFpV3HkqRExnrGEn1SapxRg0bT/ZrDf2tDlJTsQ="
+    },
+    {
+      "port": 11002,
+      "publicKey": "3wmATLUUyqurFLqEVN3XvrRBuTaJQ4StOOirLGDbCeI="
+    },
+    {
+      "port": 11003,
+      "publicKey": "A+i9YyJWtmPIPXuuZhZYC49+4T7evDnxUU8lk3wf+rA="
+    }
+  ]
+}
