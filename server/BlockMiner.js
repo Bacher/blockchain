@@ -8,7 +8,7 @@ class BlockMiner {
         const order = [];
 
         for (let node of config.nodes) {
-            if (node.port === block.data[2]) {
+            if (node.port === block.data.nodePort) {
                 continue;
             }
 

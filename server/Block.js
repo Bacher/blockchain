@@ -24,13 +24,13 @@ class Block {
         const prev = this._prevBlock;
         this._sealStamp = new Date();
 
-        const data = JSON.stringify([
-            prev.hash,
-            prev.data[1] + 1,
-            config.port,
-            this._transactions,
-            this._sealStamp,
-        ]);
+        const data = JSON.stringify({
+            prevHash: prev.hash,
+            blockNum: prev.data.blockNum + 1,
+            nodePort: config.port,
+            transactions: this._transactions,
+            stamp: this._sealStamp,
+        });
 
         return {
             data,

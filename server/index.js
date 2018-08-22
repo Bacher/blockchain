@@ -48,7 +48,7 @@ async function init() {
 
         const lastBlock = blocks.getLast();
 
-        const lastBlockStamp = new Date(lastBlock.data[4]);
+        const lastBlockStamp = new Date(lastBlock.data.stamp);
 
         const interval = Math.max(
             0,
@@ -104,7 +104,7 @@ async function init() {
             return;
         }
 
-        const [prevHash, , nodePort, transactions, stamp] = JSON.parse(
+        const { prevHash, nodePort, transactions, stamp } = JSON.parse(
             block.data
         );
 
@@ -136,7 +136,7 @@ async function init() {
             return;
         }
 
-        const delta = stamp - lastBlock.data[4];
+        const delta = stamp - lastBlock.data.stamp;
 
         if (delta < 30 + index * 10000) {
             console.error(
@@ -207,8 +207,8 @@ async function init() {
 
         if (myLast.hash !== mostRecent.result.hash) {
             if (
-                myLast.data[1] < mostRecent.result.lastBlock.blockNum ||
-                (myLast.data[1] === mostRecent.result.lastBlock.blockNum &&
+                myLast.data.blockNum < mostRecent.result.lastBlock.blockNum ||
+                (myLast.data.blockNum === mostRecent.result.lastBlock.blockNum &&
                     myLast.hash < mostRecent.result.lastBlock.hash)
             ) {
                 await startSyncing(
@@ -245,7 +245,7 @@ async function init() {
             newBlocks.push(...blocksPart);
 
             const block = blocksPart[blocksPart.length - 1];
-            const ourBlock = blocks.get(JSON.parse(block.data)[1]);
+            const ourBlock = blocks.get(JSON.parse(block.data).blockNum);
 
             if (ourBlock && block.hash === ourBlock.hash) {
                 break;

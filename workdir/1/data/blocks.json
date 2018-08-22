@@ -1,6 +1,6 @@
 [
   {
-    "data": "[\"\",0,0,[],\"2018-08-21T14:42:34.678Z\"]",
+    "data": "{\"prevHash\":\"\",\"blockNum\":0,\"nodePort\":0,\"transactions\":[],\"stamp\":\"2018-08-21T14:42:34.678Z\"}",
     "hash": "",
     "publicKey": ""
   }

@@ -150,7 +150,7 @@ class Connections extends EventEmitter {
                 return {
                     lastBlock: {
                         hash: last.hash,
-                        blockNum: last.data[1],
+                        blockNum: last.data.blockNum,
                     },
                 };
         }

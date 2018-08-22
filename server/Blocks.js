@@ -25,7 +25,7 @@ class Blocks {
             block.data = JSON.parse(block.rawData);
         }
 
-        const blockNum = blocks[0].data[1];
+        const blockNum = blocks[0].data.blockNum;
 
         this._blocks = this._blocks.slice(0, blockNum).concat(blocks);
 
@@ -48,12 +48,12 @@ class Blocks {
 
         console.log(
             'NEW BLOCK',
-            block.data[1],
-            block.data[2],
+            block.data.blockNum,
+            block.data.nodePort,
             'tx:',
-            block.data[3].length,
-            block.data[4],
-            new Date(block.data[4]) - new Date(lastBlock.data[4]),
+            block.data.transactions.length,
+            block.stamp,
+            new Date(block.data.stamp) - new Date(lastBlock.data.stamp),
             block.hash
         );
 
