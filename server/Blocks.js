@@ -41,9 +41,6 @@ class Blocks {
     }
 
     add(block) {
-        block.rawData = block.data;
-        block.data = JSON.parse(block.rawData);
-
         const lastBlock = this.getLast();
 
         console.log(
@@ -52,7 +49,7 @@ class Blocks {
             block.data.nodePort,
             'tx:',
             block.data.transactions.length,
-            block.stamp,
+            block.data.stamp,
             new Date(block.data.stamp) - new Date(lastBlock.data.stamp),
             block.hash
         );

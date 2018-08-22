@@ -14,7 +14,7 @@ const port = config.port;
 
 let timeoutId = null;
 
-let isSyncing = true;
+let isSyncing = 0;
 
 async function init() {
     const blocks = new Blocks();
@@ -68,6 +68,9 @@ async function init() {
 
             connections.broadcastRequest('newBlock', block);
 
+            block.rawData = block.data;
+            block.data = JSON.parse(block.rawData);
+
             addBlock(block);
         }, interval);
     }
@@ -94,7 +97,7 @@ async function init() {
     await syncState();
 
     connections.on('newblock', block => {
-        if (isSyncing) {
+        if (isSyncing > 0) {
             return;
         }
 
@@ -104,9 +107,10 @@ async function init() {
             return;
         }
 
-        const { prevHash, nodePort, transactions, stamp } = JSON.parse(
-            block.data
-        );
+        block.rawData = block.data;
+        block.data = JSON.parse(block.rawData);
+
+        const { prevHash, nodePort, transactions, stamp } = block.data;
 
         const ts = new Date(stamp);
 

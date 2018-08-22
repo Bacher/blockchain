@@ -7,7 +7,19 @@ class Block {
     }
 
     static verifyBlock(block) {
-        return crypto.verify(block.data, block.hash, block.publicKey);
+        const verify = crypto.verify(block.rawData, block.hash, block.publicKey);
+
+        if (!verify) {
+            return false;
+        }
+
+        for (let node of config.nodes) {
+            if (node.port === block.data.nodePort) {
+                return node.publicKey === block.publicKey;
+            }
+        }
+
+        return false;
     }
 
     constructor(prevBlock) {
