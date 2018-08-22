@@ -8,6 +8,10 @@ class BlockMiner {
         const order = [];
 
         for (let node of config.nodes) {
+            if (node.port === block.data[2]) {
+                continue;
+            }
+
             const key = block.hash + node.publicKey;
 
             const hash = crypto

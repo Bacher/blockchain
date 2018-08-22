@@ -14,6 +14,8 @@ const port = config.port;
 
 let timeoutId = null;
 
+let isSyncing = true;
+
 async function init() {
     const blocks = new Blocks();
     const tQueue = new TransactionQueue();
@@ -39,11 +41,19 @@ async function init() {
 
     function checkNextBlockMiner() {
         const index = blocks.nextBlockMinersOrder.indexOf(config.port);
+
+        if (index === -1) {
+            return;
+        }
+
         const lastBlock = blocks.getLast();
 
         const lastBlockStamp = new Date(lastBlock.data[4]);
 
-        const interval = Math.max(0, lastBlockStamp.getTime() + (30 + index * 10) * 1000 - Date.now());
+        const interval = Math.max(
+            0,
+            lastBlockStamp.getTime() + (30 + index * 10) * 1000 - Date.now()
+        );
 
         timeoutId = setTimeout(() => {
             const newBlock = new Block(blocks.getLast());
@@ -84,6 +94,10 @@ async function init() {
     await syncState();
 
     connections.on('newblock', block => {
+        if (isSyncing) {
+            return;
+        }
+
         const lastBlock = blocks.getLast();
 
         if (lastBlock.hash === block.hash) {
@@ -116,6 +130,11 @@ async function init() {
         }
 
         const index = blocks.nextBlockMinersOrder.indexOf(nodePort);
+
+        if (index === -1) {
+            console.error('INVALID MINER');
+            return;
+        }
 
         const delta = stamp - lastBlock.data[4];
 
@@ -160,7 +179,17 @@ async function init() {
     }
 
     async function syncState() {
-        const results = await connections.broadcastRequest('getState');
+        isSyncing++;
+
+        let results = [];
+
+        while (results.length === 0) {
+            results = await connections.broadcastRequest('getState');
+
+            if (results.length === 0) {
+                await wait(1000);
+            }
+        }
 
         const myLast = blocks.getLast();
 
@@ -174,10 +203,6 @@ async function init() {
             ) {
                 mostRecent = response;
             }
-        }
-
-        if (!mostRecent) {
-            return;
         }
 
         if (myLast.hash !== mostRecent.result.hash) {
@@ -198,6 +223,8 @@ async function init() {
                 });
             }
         }
+
+        isSyncing--;
     }
 
     async function startSyncing(port, blockNum) {
@@ -235,6 +262,9 @@ async function init() {
 
         blocks.resetChain(newBlocks);
         tQueue.clear();
+
+        // second syncState for completing sync
+        await syncState();
     }
 }
 
